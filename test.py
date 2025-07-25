@@ -16,6 +16,11 @@ from utils.util import state_dict_data_parallel_fix
 import numpy as np
 import os
 import copy
+import pathlib
+import platform
+
+if platform.system() == 'Windows':
+    pathlib.PosixPath = pathlib.WindowsPath
 
 # sacred 실험 객체
 ex = Experiment('test')
@@ -54,7 +59,7 @@ def run():
         tokenizer_builder = transformers.AutoTokenizer
     tokenizer = tokenizer_builder.from_pretrained(
         text_model_name,
-        model_max_length=config['arch']['args']['text_params'].get('max_length', 1e6),
+        model_max_length=int(config['arch']['args']['text_params'].get('max_length', 1e6)),
         TOKENIZERS_PARALLELISM=False)
 
     # 모델 아키텍처 로드
@@ -68,7 +73,7 @@ def run():
 
     # 4. 체크포인트 불러오기
     if config.resume is not None:
-        checkpoint = torch.load(config.resume)
+        checkpoint = torch.load(config.resume, weights_only=False)
         state_dict = checkpoint['state_dict']
         new_state_dict = state_dict_data_parallel_fix(state_dict, model.state_dict())
         model.load_state_dict(new_state_dict, strict=True)
