@@ -370,3 +370,133 @@ def video_precision_adj(output, target):
     denom = len(target[:, :, 0].unique())
 
     return correct / denom
+
+def ntu_t2v_metrics(sims, action_labels, query_masks=None):
+    """NTU 데이터셋을 위한 Text-to-Video 검색 메트릭
+    
+    Args:
+        sims (np.array): [num_unique_labels, num_videos] 유사도 매트릭스
+        action_labels (list): 각 비디오의 액션 라벨 (길이: num_videos)
+        query_masks: 사용하지 않음 (NTU에서는 필요 없음)
+    
+    Returns:
+        dict: 검색 성능 메트릭
+    """
+    assert sims.ndim == 2, "expected a matrix"
+    num_queries, num_vids = sims.shape  # [60, 2880]
+    
+    # 액션 라벨들을 유니크하게 정렬
+    unique_labels = sorted(list(set(action_labels)))
+    assert len(unique_labels) == num_queries, f"쿼리 수({num_queries})와 유니크 라벨 수({len(unique_labels)})가 맞지 않음"
+    
+    # 각 라벨별로 해당하는 비디오 인덱스들 구하기
+    label_to_video_indices = {}
+    for video_idx, label in enumerate(action_labels):
+        if label not in label_to_video_indices:
+            label_to_video_indices[label] = []
+        label_to_video_indices[label].append(video_idx)
+    
+    query_ranks = []
+    
+    for query_idx, query_label in enumerate(unique_labels):
+        # 현재 쿼리 라벨에 해당하는 비디오들의 인덱스
+        gt_video_indices = label_to_video_indices[query_label]
+        
+        # 현재 쿼리에 대한 모든 비디오의 유사도 점수
+        query_sims = sims[query_idx, :]  # shape: [num_videos]
+        
+        # 유사도를 거리로 변환 (높은 유사도 = 낮은 거리)
+        query_dists = -query_sims
+        
+        # 모든 비디오를 거리 순으로 정렬
+        sorted_indices = np.argsort(query_dists)
+        
+        # 정답 비디오들의 랭크 찾기 (첫 번째 정답의 랭크 사용)
+        min_rank = float('inf')
+        for gt_idx in gt_video_indices:
+            rank = np.where(sorted_indices == gt_idx)[0][0] + 1  # 1-based rank
+            min_rank = min(min_rank, rank)
+        
+        query_ranks.append(min_rank)
+    
+    query_ranks = np.array(query_ranks)
+    
+    # 메트릭 계산
+    r1 = 100 * np.mean(query_ranks <= 1)
+    r5 = 100 * np.mean(query_ranks <= 5)
+    r10 = 100 * np.mean(query_ranks <= 10)
+    r50 = 100 * np.mean(query_ranks <= 50)
+    medr = np.median(query_ranks)
+    meanr = np.mean(query_ranks)
+    
+    return {
+        "R1": r1,
+        "R5": r5, 
+        "R10": r10,
+        "R50": r50,
+        "MedR": medr,
+        "MeanR": meanr,
+        "query_ranks": query_ranks
+    }
+
+
+def ntu_v2t_metrics(sims, action_labels, query_masks=None):
+    """NTU 데이터셋을 위한 Video-to-Text 검색 메트릭
+    
+    Args:
+        sims (np.array): [num_unique_labels, num_videos] 유사도 매트릭스  
+        action_labels (list): 각 비디오의 액션 라벨 (길이: num_videos)
+        query_masks: 사용하지 않음
+        
+    Returns:
+        dict: 검색 성능 메트릭
+    """
+    # sims를 transpose: [num_videos, num_unique_labels]
+    sims = sims.T
+    
+    assert sims.ndim == 2, "expected a matrix"
+    num_videos, num_labels = sims.shape  # [2880, 60]
+    
+    # 유니크 라벨들 정렬
+    unique_labels = sorted(list(set(action_labels)))
+    assert len(unique_labels) == num_labels, f"라벨 수({num_labels})와 유니크 라벨 수({len(unique_labels)})가 맞지 않음"
+    
+    query_ranks = []
+    
+    for video_idx in range(num_videos):
+        # 현재 비디오의 정답 라벨
+        gt_label = action_labels[video_idx]
+        gt_label_idx = unique_labels.index(gt_label)
+        
+        # 현재 비디오에 대한 모든 라벨의 유사도 점수
+        video_sims = sims[video_idx, :]  # shape: [num_labels]
+        
+        # 유사도를 거리로 변환
+        video_dists = -video_sims
+        
+        # 모든 라벨을 거리 순으로 정렬
+        sorted_indices = np.argsort(video_dists)
+        
+        # 정답 라벨의 랭크 찾기
+        rank = np.where(sorted_indices == gt_label_idx)[0][0] + 1  # 1-based rank
+        query_ranks.append(rank)
+    
+    query_ranks = np.array(query_ranks)
+    
+    # 메트릭 계산
+    r1 = 100 * np.mean(query_ranks <= 1)
+    r5 = 100 * np.mean(query_ranks <= 5)
+    r10 = 100 * np.mean(query_ranks <= 10)
+    r50 = 100 * np.mean(query_ranks <= 50)
+    medr = np.median(query_ranks)
+    meanr = np.mean(query_ranks)
+    
+    return {
+        "R1": r1,
+        "R5": r5,
+        "R10": r10, 
+        "R50": r50,
+        "MedR": medr,
+        "MeanR": meanr,
+        "query_ranks": query_ranks
+    }

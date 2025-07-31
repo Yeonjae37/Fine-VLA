@@ -13,11 +13,15 @@ from model.model import compute_similarity
 from parse_config import ConfigParser
 from trainer.trainer import verbose
 from utils.util import state_dict_data_parallel_fix
+from utils.results import save_ntu_results
+from model.text_augmentation import augment_text_labels, average_augmented_embeddings
 import numpy as np
 import os
 import copy
 import pathlib
 import platform
+
+RESULTS_AVAILABLE = True
 
 if platform.system() == 'Windows':
     pathlib.PosixPath = pathlib.WindowsPath
@@ -42,7 +46,7 @@ def run():
     # 데이터 갯수 확인
     n_samples = len(data_loader.dataset)
 
-    # 2. Tokenizer 준비 (config에 지정된 텍스트 모델 이름 가져옴)
+    # 2. Tokenizer 준비
     text_model_name = config['arch']['args']['text_params']['model']
     if "openai/clip" in text_model_name:
         tokenizer_builder = transformers.CLIPTokenizer
@@ -171,6 +175,35 @@ def run():
 
     text_embeds = torch.cat(text_embed_arr)
     mask = None
+    
+    if hasattr(data_loader.dataset, 'dataset_name') and data_loader.dataset.dataset_name == 'NTU':
+        unique_labels = sorted(list(set(meta_arr['raw_captions'])))
+
+        aug_data = augment_text_labels(unique_labels)
+        augmented_texts = aug_data['augmented_texts']
+        label_groups = aug_data['label_groups']
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        aug_embeds = []
+
+        batch_size = 32
+        for i in range(0, len(augmented_texts), batch_size):
+            batch_texts = augmented_texts[i:i+batch_size]
+            batch_tokens = tokenizer(batch_texts, return_tensors='pt', padding=True, truncation=True)
+            batch_tokens = {key: val.to(device) for key, val in batch_tokens.items()}
+
+            with torch.no_grad():
+                # DataParallel 처리
+                if hasattr(model, 'module'):
+                    batch_text_embeds = model.module.compute_text(batch_tokens)
+                else:
+                    batch_text_embeds = model.compute_text(batch_tokens)
+                aug_embeds.append(batch_text_embeds.cpu())
+        
+        all_aug_embeds = torch.cat(aug_embeds, dim=0)  # [total_augmented_texts, embed_dim] 모든 증강 임베딩 결합
+        averaged_text_embeds = average_augmented_embeddings(all_aug_embeds, label_groups) # 라벨별로 증강 임베딩들을 평균내기
+        text_embeds = averaged_text_embeds # 텍스트 임베딩을 증강된 평균 임베딩으로 교체
+    
     if data_loader.dataset.sliding_window_stride != -1:
         cpu_vid_embeds = vid_embeds
         cpu_text_embeds = text_embeds
@@ -223,11 +256,29 @@ def run():
         nested_metrics = {}
         for metric in metric_fns:
             metric_name = metric.__name__
-            res = metric(sims, query_masks=mask)
+
+            if metric_name.startswith('ntu_'):
+                action_labels = meta_arr['raw_captions']
+                res = metric(sims, action_labels, query_masks=mask)
+            else:
+                res = metric(sims, query_masks=mask)
+                
             verbose(epoch=0, metrics=res, name="", mode=metric_name)
             nested_metrics[metric_name] = res
-        # else:
-        #     visualise_text_video_sim(sims, mask, meta_arr, num_vis=10)
+
+        if (hasattr(data_loader.dataset, 'dataset_name') and 
+            data_loader.dataset.dataset_name == 'NTU' and 
+            RESULTS_AVAILABLE):
+
+            action_labels = meta_arr['raw_captions']
+            unique_labels = sorted(list(set(action_labels)))
+                
+            t2v_file, v2t_file = save_ntu_results(
+                sims=sims, 
+                action_labels=action_labels,
+                unique_labels=unique_labels,
+                save_dir="results"
+            )
 
     # if config.config['visualizer']:
     #    raise NotImplementedError

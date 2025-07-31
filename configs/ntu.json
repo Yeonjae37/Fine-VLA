@@ -24,7 +24,7 @@
         "type": "TextVideoDataLoader",
         "args":{
             "dataset_name": "NTU",
-            "data_dir": "data/nturgbd_rgb",
+            "data_dir": "C:/Users/user/Documents/data/nturgbd_rgb",
             "shuffle": true,
             "num_workers": 16,
             "batch_size": 16,
@@ -55,9 +55,9 @@
         }
     },
     "metrics": [
-        "t2v_metrics",
-        "v2t_metrics"
-     ],
+        "ntu_t2v_metrics",
+        "ntu_v2t_metrics"
+    ],
     "trainer": {
         "epochs": 100,
         "max_samples_per_epoch": 9000,

@@ -26,12 +26,19 @@ class NTU(TextVideoDataset):
         else:
             df = df[df['video_id'].isin(test_df['videoid'])]
 
-        self.metadata = df.groupby(['video_id'])['caption'].apply(list)
         if self.subsample < 1:
-            self.metadata = self.metadata.sample(frac=self.subsample)
+            df = df.sample(frac=self.subsample)
+
+        self.metadata = df.set_index('video_id')[['caption', 'video_path']]
+        
+        self.metadata['captions'] = self.metadata['caption'].apply(lambda x: [x])
 
     def _get_video_path(self, sample):
-        return os.path.join(self.data_dir, 'videos', 'all', sample.name + '.mp4'), sample.name + '.mp4'
+        rel_path = sample['video_path']
+        actual_rel_path = os.path.join('video', rel_path)
+        abs_path = os.path.join(self.data_dir, actual_rel_path)
+        
+        return abs_path, actual_rel_path
     
     def _get_caption(self, sample):
         caption_sample = self.text_params.get('caption_sample', "rand")

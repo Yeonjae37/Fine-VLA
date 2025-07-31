@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, get_worker_info
 from torchvision import transforms
 
 
-class TextVideoDataset(Dataset): # Pytorch Dataset을 상속받는 기본 클래스
+class TextVideoDataset(Dataset):
     def __init__(self,
                 dataset_name,  # 데이터셋 이름
                 text_params, # 텍스트 처리 파라미터
@@ -30,9 +30,9 @@ class TextVideoDataset(Dataset): # Pytorch Dataset을 상속받는 기본 클래
         self.text_params = text_params # 텍스트 파라미터 저장
         self.video_params = video_params # 비디오 파라미터 저장
         # check for environment variables
-        self.data_dir = os.path.expandvars(data_dir) # 횐경변수 확장
-        if metadata_dir is not None: # 메타데이터 디렉토리가 지정되었으면
-            self.metadata_dir = os.path.expandvars(metadata_dir) # 환경변수 확장해서 저장
+        self.data_dir = os.path.expandvars(data_dir)
+        if metadata_dir is not None:
+            self.metadata_dir = os.path.expandvars(metadata_dir)
         else:
             self.metadata_dir = self.data_dir # 데이터 디렉토리와 같게 설정
         self.split = split
@@ -100,7 +100,7 @@ class TextVideoDataset(Dataset): # Pytorch Dataset을 상속받는 기본 클래
             else:
                 print(f"Warning: missing video file {video_fp}.") # 비디오 파일이 없으면 경고 메시지 출력
                 assert False # 프로그램 종료
-        except Exception as e: # 예외 처리
+        except Exception as e:
             if video_loading == 'strict': # 비디오 로딩 모드가 strict일 때
                 raise ValueError(
                     f'Video loading failed for {video_fp}, video loading for this dataset is strict.') from e
