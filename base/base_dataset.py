@@ -12,37 +12,37 @@ from torch.utils.data import Dataset, get_worker_info
 from torchvision import transforms
 
 
-class TextVideoDataset(Dataset):
+class TextVideoDataset(Dataset): # Pytorch Dataset을 상속받는 기본 클래스
     def __init__(self,
-                 dataset_name,
-                 text_params,
-                 video_params,
-                 data_dir,
-                 metadata_dir=None,
-                 split='train',
-                 tsfms=None,
-                 cut=None,
-                 subsample=1,
-                 sliding_window_stride=-1,
-                 reader='decord'
-                 ):
-        self.dataset_name = dataset_name
-        self.text_params = text_params
-        self.video_params = video_params
+                dataset_name,  # 데이터셋 이름
+                text_params, # 텍스트 처리 파라미터
+                video_params, # 비디오 처리 파라미터
+                data_dir, # 데이터셋 디렉토리
+                metadata_dir=None, # 메타데이터 파일들이 있는 디렉토리 (None이면 data_dir와 동일)
+                split='train', # 데이터셋 분할 (train, val, test)
+                tsfms=None, # 데이터 변환 함수
+                cut=None, # 데이터셋 분할 방법 (None이면 전체 데이터셋 사용)
+                subsample=1, # 데이터셋 서브샘플링 비율
+                sliding_window_stride=-1, # 비디오 프레임 샘플링 간격
+                reader='decord' # 비디오 리더 (av, cv2, decord)
+                ):
+        self.dataset_name = dataset_name # 인스턴스 변수에 저장
+        self.text_params = text_params # 텍스트 파라미터 저장
+        self.video_params = video_params # 비디오 파라미터 저장
         # check for environment variables
-        self.data_dir = os.path.expandvars(data_dir)
-        if metadata_dir is not None:
-            self.metadata_dir = os.path.expandvars(metadata_dir)
+        self.data_dir = os.path.expandvars(data_dir) # 횐경변수 확장
+        if metadata_dir is not None: # 메타데이터 디렉토리가 지정되었으면
+            self.metadata_dir = os.path.expandvars(metadata_dir) # 환경변수 확장해서 저장
         else:
-            self.metadata_dir = self.data_dir
+            self.metadata_dir = self.data_dir # 데이터 디렉토리와 같게 설정
         self.split = split
         self.transforms = tsfms
         self.cut = cut
         self.subsample = subsample
         self.sliding_window_stride = sliding_window_stride
         self.video_reader = video_reader[reader]
-        self.label_type = 'caption'
-        self._load_metadata()
+        self.label_type = 'caption' # 라벨 타입 설정
+        self._load_metadata() # 메타데이터 로딩 (자식 클래스에서 구현)
         if self.sliding_window_stride != -1:
             if self.split != 'test':
                 raise ValueError('Fixing frame sampling is for test time only. can remove but...')
@@ -67,8 +67,8 @@ class TextVideoDataset(Dataset):
 
         return vlen_li
 
-    def _fix_temporal_samples(self):
-        self.metadata['vlen'] = self._get_video_lens()
+    def _fix_temporal_samples(self): # 슬라이딩 윈도우용 고정 샘플링 설정
+        self.metadata['vlen'] = self._get_video_lens() # 각 비디오의 길이를 메타데이터에 추가
         self.metadata['frame_intervals'] = self.metadata['vlen'].apply(
             lambda x: np.linspace(start=0, stop=x, num=min(x, self.video_params['num_frames']) + 1).astype(int))
         self.metadata['fix_start'] = self.metadata['frame_intervals'].apply(
@@ -76,39 +76,39 @@ class TextVideoDataset(Dataset):
         )
         self.metadata = self.metadata.explode('fix_start')
 
-    def __len__(self):
+    def __len__(self): # 메타데이터 행 수 반환
         return len(self.metadata)
 
-    def __getitem__(self, item):
-        item = item % len(self.metadata)
-        sample = self.metadata.iloc[item]
-        video_fp, rel_fp = self._get_video_path(sample)
-        caption = self._get_caption(sample)
+    def __getitem__(self, item): # 특정 인덱스의 데이터 반환
+        item = item % len(self.metadata) # 인덱스를 데이터셋 크기로 모듈로 연산
+        sample = self.metadata.iloc[item] # 해당 인덱스의 메타데이터 행 가져오기
+        video_fp, rel_fp = self._get_video_path(sample) # 비디오 경로 가져오기
+        caption = self._get_caption(sample) # 캡션 가져오기
 
-        video_loading = self.video_params.get('loading', 'strict')
-        frame_sample = 'rand'
-        fix_start = None
-        if self.split == 'test':
-            frame_sample = 'uniform'
-        if self.sliding_window_stride != -1:
-            fix_start = sample['fix_start']
+        video_loading = self.video_params.get('loading', 'strict') # 비디오 로딩 모드
+        frame_sample = 'rand' # 기본 프레임 샘플링 : 랜덤
+        fix_start = None # 고정 시작점 초기화
+        if self.split == 'test': # 테스트 모드면
+            frame_sample = 'uniform' # 균등 샘플링
+        if self.sliding_window_stride != -1: # 슬라이딩 윈도우 사용 시
+            fix_start = sample['fix_start'] # 고정 시작점 사용
 
         try:
-            if os.path.isfile(video_fp):
+            if os.path.isfile(video_fp): # 비디오 파일이 존재하면
                 imgs, idxs = self.video_reader(video_fp, self.video_params['num_frames'], frame_sample,
-                                               fix_start=fix_start)
+                                               fix_start=fix_start) # 비디오 파일 읽기
             else:
-                print(f"Warning: missing video file {video_fp}.")
-                assert False
-        except Exception as e:
-            if video_loading == 'strict':
+                print(f"Warning: missing video file {video_fp}.") # 비디오 파일이 없으면 경고 메시지 출력
+                assert False # 프로그램 종료
+        except Exception as e: # 예외 처리
+            if video_loading == 'strict': # 비디오 로딩 모드가 strict일 때
                 raise ValueError(
                     f'Video loading failed for {video_fp}, video loading for this dataset is strict.') from e
             else:
-                imgs = Image.new('RGB', (self.video_params['input_res'], self.video_params['input_res']), (0, 0, 0))
-                imgs = transforms.ToTensor()(imgs).unsqueeze(0)
+                imgs = Image.new('RGB', (self.video_params['input_res'], self.video_params['input_res']), (0, 0, 0)) # 비디오 로딩 실패 시 빈 이미지 생성
+                imgs = transforms.ToTensor()(imgs).unsqueeze(0) # 이미지를 텐서로 변환
 
-        if self.transforms is not None:
+        if self.transforms is not None: # 데이터 변환 함수가 있으면 적용
             imgs = self.transforms(imgs)
 
         final = torch.zeros([self.video_params['num_frames'], 3, self.video_params['input_res'],

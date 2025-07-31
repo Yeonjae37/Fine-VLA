@@ -28,15 +28,6 @@ ex = Experiment('test')
 
 @ex.main # sacred 실행 메인 함수
 def run():
-    """
-    오프라인 평가 루틴
-        학습된 모델 불러와 텍스트/비디오 임베딩 생성 -> metric.py 지표로 성능 산출
-        1) DataLoader 설정
-        2) 모델 로드
-        3) 텍스트, 비디오 임베딩 생성
-        4) compute_similarity로 유사도 계산
-        5) metric.py 지표(t2v_metrics, v2t_metrics)로 성능 산출
-    """
 
     # 1.DataLoader 설정
     config._config['data_loader']['args']['split'] = args.split
@@ -307,7 +298,7 @@ if __name__ == '__main__':
                       help='split to evaluate on.')
     args.add_argument('--batch_size', default=16, type=int,
                       help='size of batch')
-    config = ConfigParser(args, test=True)
+    config = ConfigParser(args, test=True) # 설정 파일 파싱
     # hack to get sliding into config
     args = args.parse_args()
     config._config['sliding_window_stride'] = args.sliding_window_stride

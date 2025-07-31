@@ -14,29 +14,25 @@ from utils import read_json, write_json
 class ConfigParser:
     def __init__(self, args, options='', timestamp=True, test=False):
         # parse default and custom cli options
-
-        # 추가 CLI 옵션들을 argparse에 등록
         for opt in options:
             args.add_argument(*opt.flags, default=None, type=opt.type)
-        args = args.parse_args() # 실제 파싱 실행
+        args = args.parse_args()
 
         if args.device:
-            os.environ["CUDA_VISIBLE_DEVICES"] = args.device # GPU 디바이스 지정
+            os.environ["CUDA_VISIBLE_DEVICES"] = args.device
 
         if args.resume is None:
-            # 새로운 실험 시작
             msg_no_cfg = "Configuration file need to be specified. Add '-c config.json', for example."
             assert args.config is not None, msg_no_cfg
-            self.cfg_fname = Path(args.config) # 설정 파일 경로
-            config = read_json(self.cfg_fname) # JSON 파일 읽기
+            self.cfg_fname = Path(args.config)
+            config = read_json(self.cfg_fname)
             self.resume = None
         else:
-            # 기존 실험 재시작
-            self.resume = Path(args.resume) # 체크포인트 경로
-            resume_cfg_fname = self.resume.parent / 'config.json' # 기존 설정 파일
-            config = read_json(resume_cfg_fname) # 기존 설정 로드 
+            self.resume = Path(args.resume)
+            resume_cfg_fname = self.resume.parent / 'config.json'
+            config = read_json(resume_cfg_fname)
             if args.config is not None:
-                config.update(read_json(Path(args.config))) # 새 설정으로 업데이트
+                config.update(read_json(Path(args.config)))
 
         # load config file and apply custom cli options
         self._config = _update_config(config, options, args)
@@ -98,6 +94,8 @@ class ConfigParser:
                 module_args[param] = self[param]
 
         return getattr(module, module_name)(*args, **module_args)
+        # getattr(module_data, 'TextVideoDataLoader')(**module_args)
+        # -> TextVideoDataLoader(**module_args)
 
     def __getitem__(self, name):
         return self.config[name]

@@ -2,6 +2,7 @@ from base import BaseDataLoaderExplicitSplit, BaseMultiDataLoader
 from data_loader.ConceptualCaptions_dataset import ConceptualCaptions3M
 from data_loader.LSMDC_dataset import LSMDC
 from data_loader.MSRVTT_dataset import MSRVTT
+from data_loader.NTU_dataset import NTU
 from data_loader.WebVid_dataset import WebVid
 from data_loader.VideoDirectory_dataset import VideoDirectory, CMDShotFeats
 from data_loader.ImageDirectory_dataset import ImageDirectory
@@ -38,6 +39,8 @@ def dataset_loader(dataset_name,
     #  ...is this safe / or just lazy?
     if dataset_name == "MSRVTT":
         dataset = MSRVTT(**kwargs)
+    elif dataset_name == "NTU":
+        dataset = NTU(**kwargs)
     elif dataset_name == "WebVid":
         dataset = WebVid(**kwargs)
     elif dataset_name == "ConceptualCaptions3M":
