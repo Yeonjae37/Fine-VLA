@@ -1,12 +1,6 @@
-from base import BaseDataLoaderExplicitSplit, BaseMultiDataLoader
-from data_loader.ConceptualCaptions_dataset import ConceptualCaptions3M
-from data_loader.LSMDC_dataset import LSMDC
-from data_loader.MSRVTT_dataset import MSRVTT
-from data_loader.NTU_dataset import NTU
-from data_loader.WebVid_dataset import WebVid
-from data_loader.VideoDirectory_dataset import VideoDirectory, CMDShotFeats
-from data_loader.ImageDirectory_dataset import ImageDirectory
-from data_loader.transforms import init_transform_dict
+from src.data.base_data_loader import BaseDataLoaderExplicitSplit, BaseMultiDataLoader
+from src.data.NTU_dataset import NTU
+from src.data.transforms import init_transform_dict
 
 
 def dataset_loader(dataset_name,
@@ -37,22 +31,8 @@ def dataset_loader(dataset_name,
     # TODO: change to...
     #  dataset = globals()[dataset_name]
     #  ...is this safe / or just lazy?
-    if dataset_name == "MSRVTT":
-        dataset = MSRVTT(**kwargs)
-    elif dataset_name == "NTU":
+    if dataset_name == "NTU":
         dataset = NTU(**kwargs)
-    elif dataset_name == "WebVid":
-        dataset = WebVid(**kwargs)
-    elif dataset_name == "ConceptualCaptions3M":
-        dataset = ConceptualCaptions3M(**kwargs)
-    elif dataset_name == "LSMDC":
-        dataset = LSMDC(**kwargs)
-    # ---experimental--- not for public
-    elif dataset_name == "VideoDirectory":
-        dataset = VideoDirectory(**kwargs)
-        dataset = ActivityNet(**kwargs)
-    elif dataset_name == "ImageDirectory":
-        dataset = ImageDirectory(**kwargs)
     else:
         raise NotImplementedError(f"Dataset: {dataset_name} not found.")
 

@@ -5,7 +5,7 @@ import random
 import numpy as np
 import pandas as pd
 
-from base.base_dataset import TextVideoDataset
+from src.data.base_dataset import TextVideoDataset
 
 class NTU(TextVideoDataset):
     def _load_metadata(self):

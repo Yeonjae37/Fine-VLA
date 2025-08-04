@@ -1,4 +1,8 @@
 import argparse
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pandas as pd
 import torch
@@ -6,15 +10,15 @@ import transformers
 from sacred import Experiment
 from tqdm import tqdm
 import glob
-import data_loader.data_loader as module_data
-import model.metric as module_metric
-import model.model as module_arch
-from model.model import compute_similarity
+import src.data.data_loader as module_data
+import src.model.metric as module_metric
+import src.model.model as module_arch
+from src.model.model import compute_similarity
 from parse_config import ConfigParser
-from trainer.trainer import verbose
-from utils.util import state_dict_data_parallel_fix
-from utils.results import save_ntu_results
-from model.text_augmentation import augment_text_labels, average_augmented_embeddings
+from src.trainer.trainer import verbose
+from src.utils.util import state_dict_data_parallel_fix
+from src.utils.results import save_ntu_results
+from src.model.text_augmentation import augment_text_labels, average_augmented_embeddings
 import numpy as np
 import os
 import copy

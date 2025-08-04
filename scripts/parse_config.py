@@ -7,8 +7,8 @@ from functools import reduce
 from operator import getitem
 from pathlib import Path
 
-from logger import setup_logging
-from utils import read_json, write_json
+from src.logger import setup_logging
+from src.utils import read_json, write_json
 
 
 class ConfigParser:

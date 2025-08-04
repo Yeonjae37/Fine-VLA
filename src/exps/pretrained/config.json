@@ -24,7 +24,7 @@
         "type": "TextVideoDataLoader",
         "args":{
             "dataset_name": "NTU",
-            "data_dir": "C:/Users/user/Documents/data/nturgbd_rgb",
+            "data_dir": "data/nturgbd",
             "shuffle": true,
             "num_workers": 16,
             "batch_size": 16,

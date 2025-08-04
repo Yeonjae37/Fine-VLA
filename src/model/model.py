@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoModel
 
-from base import BaseModel
-from model.video_transformer import SpaceTimeTransformer
-from utils.util import state_dict_data_parallel_fix
+from src.model.base_model import BaseModel
+from src.model.video_transformer import SpaceTimeTransformer
+from src.utils.util import state_dict_data_parallel_fix
 
 
 class FrozenInTime(BaseModel):
