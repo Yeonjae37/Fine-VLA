@@ -5,7 +5,7 @@
         "type": "FrozenInTime",
         "args": {
             "video_params": {
-                "model": "SpaceTimeTransformer",
+                "model": "VJEPA2",
                 "arch_config": "base_patch16_224",
                 "num_frames": 4,
                 "pretrained": true,

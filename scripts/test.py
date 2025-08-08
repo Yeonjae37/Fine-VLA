@@ -58,7 +58,10 @@ def run():
     tokenizer = tokenizer_builder.from_pretrained(
         text_model_name,
         model_max_length=int(config['arch']['args']['text_params'].get('max_length', 1e6)),
-        TOKENIZERS_PARALLELISM=False)
+        TOKENIZERS_PARALLELISM=False,
+        local_files_only=True
+        )
+
 
     # 모델 아키텍처 로드
     # config에 지정된 아키텍처를 module_arch에서 생성
@@ -71,10 +74,24 @@ def run():
 
     # 4. 체크포인트 불러오기
     if config.resume is not None:
-        checkpoint = torch.load(config.resume, weights_only=False)
+        if str(config.resume).endswith(".pkl"):
+            import pickle
+            with open(config.resume, "rb") as f:
+                checkpoint = pickle.load(f)
+        else:
+            checkpoint = torch.load(config.resume, weights_only=False)
         state_dict = checkpoint['state_dict']
         new_state_dict = state_dict_data_parallel_fix(state_dict, model.state_dict())
-        model.load_state_dict(new_state_dict, strict=True)
+        
+        # VJEPA2 모델을 사용할 때는 strict=False로 설정하여 구조 불일치 허용
+        if 'VJEPA2' in config['arch']['args']['video_params']['model']:
+            keys_to_remove = [k for k in new_state_dict if k.startswith('vid_proj')]
+            for k in keys_to_remove:
+                new_state_dict.pop(k)
+            model.load_state_dict(new_state_dict, strict=False)
+            print(f'VJEPA2 모델 사용 중: vid_proj({len(keys_to_remove)}개) 제외하고 로딩합니다.')
+        else:
+            model.load_state_dict(new_state_dict, strict=True)
     else:
         print('Using random weights')
 

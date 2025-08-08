@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoModel
+from transformers import AutoVideoProcessor
 
 from src.model.base_model import BaseModel
 from src.model.video_transformer import SpaceTimeTransformer
@@ -50,6 +51,13 @@ class FrozenInTime(BaseModel):
                 vit_checkpoint = vit_model.state_dict()
                 model.load_state_dict(vit_checkpoint, strict=False)
             self.video_model = model
+
+        elif video_params['model'] == "VJEPA2": # 추가!!!
+            hf_repo = video_params.get("hf_repo", "facebook/vjepa2-vitl-fpc64-256")
+            self.video_processor = AutoVideoProcessor.from_pretrained(hf_repo)
+            self.video_model = AutoModel.from_pretrained("facebook/vjepa2-vitg-fpc64-256").eval()
+            ftr_dim = self.video_model.config.hidden_size
+
         else:
             raise NotImplementedError(f"{video_params['model']} not implemented")
 
@@ -108,7 +116,20 @@ class FrozenInTime(BaseModel):
         return text_embeddings
 
     def compute_video(self, video_data):
-        video_embeddings = self.video_model(video_data)
+        #video_embeddings = self.video_model(video_data)
+        #video_embeddings = self.vid_proj(video_embeddings)
+        #return video_embeddings
+        if hasattr(self, "video_processor"):
+            inputs = self.video_processor(video_data, return_tensors="pt")
+            outputs = self.video_model(**inputs)
+            cls_emb = outputs.last_hidden_state[:, 0, :]
+            video_embeddings = cls_emb
+        else:
+            video_embeddings = self.video_model(video_data)
+
+        if video_embeddings.dtype != self.vid_proj[0].weight.dtype:
+            video_embeddings = video_embeddings.to(self.vid_proj[0].weight.dtype)
+            
         video_embeddings = self.vid_proj(video_embeddings)
         return video_embeddings
 
