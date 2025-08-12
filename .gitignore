@@ -198,3 +198,14 @@ data/nturgbd/
 src/exps/pretrained/cc-webvid2m-4f_stformer_b_16_224.pth.tar
 results/
 src/exps/vitg-384.pt
+src/exps/ssv2-vitg-384-64x2x3.pt
+finetuned_epoch1.pkl
+finetuned_epoch2.pkl
+finetuned_epoch3.pkl
+finetuned_epoch4.pkl
+finetuned_epoch5.pkl
+finetuned_epoch6.pkl
+finetuned_epoch7.pkl
+finetuned_epoch8.pkl
+finetuned_epoch9.pkl
+finetuned_epoch10.pkl

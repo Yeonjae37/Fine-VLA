@@ -84,12 +84,15 @@ def run():
         new_state_dict = state_dict_data_parallel_fix(state_dict, model.state_dict())
         
         # VJEPA2 모델을 사용할 때는 strict=False로 설정하여 구조 불일치 허용
-        if 'VJEPA2' in config['arch']['args']['video_params']['model']:
-            keys_to_remove = [k for k in new_state_dict if k.startswith('vid_proj')]
-            for k in keys_to_remove:
-                new_state_dict.pop(k)
-            model.load_state_dict(new_state_dict, strict=False)
-            print(f'VJEPA2 모델 사용 중: vid_proj({len(keys_to_remove)}개) 제외하고 로딩합니다.')
+        if config['arch']['args']['video_params']['model'] == 'VJEPA2':
+            keep = {}
+            for k, v in new_state_dict.items():
+                # 텍스트 백본 + 텍스트 projection 만 유지
+                if k.startswith('text_model') or k.startswith('txt_proj'):
+                    keep[k] = v
+            # video_model / vid_proj 는 버림 (V-JEPA2 로컬 가중치 + 새 proj 학습)
+            model.load_state_dict(keep, strict=False)
+            print(f"VJEPA2: kept {len(keep)} text-side keys; dropped video_model/vid_proj")
         else:
             model.load_state_dict(new_state_dict, strict=True)
     else:

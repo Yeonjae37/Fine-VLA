@@ -55,7 +55,12 @@ class FrozenInTime(BaseModel):
         elif video_params['model'] == "VJEPA2": # 추가!!!
             hf_repo = video_params.get("hf_repo", "facebook/vjepa2-vitl-fpc64-256")
             self.video_processor = AutoVideoProcessor.from_pretrained(hf_repo)
-            self.video_model = AutoModel.from_pretrained("facebook/vjepa2-vitg-fpc64-256").eval()
+            self.video_model = AutoModel.from_pretrained(
+                hf_repo,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                attn_implementation="sdpa"
+            ).eval()
             ftr_dim = self.video_model.config.hidden_size
 
         else:
@@ -63,6 +68,8 @@ class FrozenInTime(BaseModel):
 
         # for backwards compatibility (old models)
         self.video_model.fc = nn.Identity()
+
+        self.video_feat_norm = nn.LayerNorm(ftr_dim, elementwise_affine=False)
 
         # Project to a common embedding
         if projection == 'minimal':
@@ -114,24 +121,55 @@ class FrozenInTime(BaseModel):
             raise NotImplementedError
         text_embeddings = self.txt_proj(text_embeddings)
         return text_embeddings
-
+    
     def compute_video(self, video_data):
-        #video_embeddings = self.video_model(video_data)
-        #video_embeddings = self.vid_proj(video_embeddings)
-        #return video_embeddings
+        # V-JEPA2 경로
         if hasattr(self, "video_processor"):
-            inputs = self.video_processor(video_data, return_tensors="pt")
-            outputs = self.video_model(**inputs)
-            cls_emb = outputs.last_hidden_state[:, 0, :]
-            video_embeddings = cls_emb
-        else:
-            video_embeddings = self.video_model(video_data)
+            # (T,C,H,W) 배치가 들어올 수 있으니 배치 차원 만들어주기
+            if video_data.dim() == 4:
+                video_data = video_data.unsqueeze(0)  # (1,T,C,H,W)
 
-        if video_embeddings.dtype != self.vid_proj[0].weight.dtype:
-            video_embeddings = video_embeddings.to(self.vid_proj[0].weight.dtype)
-            
-        video_embeddings = self.vid_proj(video_embeddings)
-        return video_embeddings
+            # V-JEPA2 권장 전처리
+            inputs = self.video_processor(
+                video_data, return_tensors="pt"
+            )
+            pixel_values_videos = inputs["pixel_values_videos"].to(
+                next(self.video_model.parameters()).device
+            )
+            pixel_values_videos = pixel_values_videos.to(
+                dtype=next(self.video_model.parameters()).dtype
+            )
+
+            with torch.no_grad():  # V-JEPA2 백본은 보통 freeze
+                # 권장: 패치/프레임 특성(토큰) 가져오기
+                feats = self.video_model.get_vision_features(pixel_values_videos=pixel_values_videos)
+                # feats shape: (B, N, D) 또는 (B, T, N, D) 구현체에 따라 다름
+                if feats.dim() == 4:
+                    # (B,T,N,D) -> 모든 토큰/시간 평균
+                    feats = feats.mean(dim=(1,2))
+                elif feats.dim() == 3:
+                    # (B,N,D) -> 모든 토큰 평균
+                    feats = feats.mean(dim=1)
+                else:
+                    # (B,D) 형태면 그대로
+                    pass
+
+            # 분포 보정
+            feats = self.video_feat_norm(feats.float())
+            feats = F.normalize(feats, dim=-1)  # L2
+
+            # 텍스트와 동일한 차원으로 투영
+            video_embeddings = self.vid_proj(feats)
+            video_embeddings = F.normalize(video_embeddings, dim=-1)  # L2
+            return video_embeddings
+
+        # 기존 SpaceTimeTransformer 경로
+        else:
+            video_embeddings = self.video_model(video_data)  # (B, D)
+            video_embeddings = self.vid_proj(video_embeddings)
+            video_embeddings = F.normalize(video_embeddings, dim=-1)
+            return video_embeddings
+
 
     def _inflate_positional_embeds(self, new_state_dict):
         # allow loading of timesformer with fewer num_frames

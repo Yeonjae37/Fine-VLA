@@ -7,9 +7,8 @@
             "video_params": {
                 "model": "VJEPA2",
                 "arch_config": "base_patch16_224",
-                "num_frames": 4,
-                "pretrained": true,
-                "time_init": "zeros"
+                "num_frames": 32,
+                "pretrained": true
             },
             "text_params": {
                 "model": "distilbert-base-uncased",
@@ -26,8 +25,8 @@
             "dataset_name": "NTU",
             "data_dir": "data/nturgbd",
             "shuffle": true,
-            "num_workers": 16,
-            "batch_size": 16,
+            "num_workers": 2,
+            "batch_size": 1,
             "split": "train",
             "cut": "standard",
             "subsample": 1,
@@ -36,11 +35,15 @@
             },
             "video_params": {
                 "extraction_fps": 25,
-                "extraction_res": 256,
-                "input_res": 224,
-                "num_frames": 4,
+                "extraction_res": 320,
+                "input_res": 320,
+                "num_frames": 32,
                 "stride": 1
-            }
+            },
+            "tsfm_params": {
+                "input_res": 320,
+                "center_crop": 320
+          }
         }
     },
     "optimizer": {
