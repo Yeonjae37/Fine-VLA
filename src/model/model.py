@@ -14,7 +14,7 @@ class FrozenInTime(BaseModel):
     def __init__(self,
                  video_params,
                  text_params,
-                 projection_dim=256,
+                 projection_dim=256, # 비디오 임베딩과 텍스트 임베딩을 같은 공간으로 투영할 때의 최종 임베딩 차원 수
                  load_checkpoint=None,
                  projection='minimal',
                  load_temporal_fix='zeros'):
@@ -44,9 +44,10 @@ class FrozenInTime(BaseModel):
             else:
                 raise NotImplementedError
 
-            model.head = nn.Identity()
-            model.pre_logits = nn.Identity()
-            ftr_dim = model.embed_dim
+            model.head = nn.Identity() # 모델의 분류헤드 제거
+            model.pre_logits = nn.Identity() # pre-logits(최종 분류 레이어 직전에 있는 표현 레이어) 제거
+            # pre_logits 제거 하는 이유 : 원시 트랜스포머 출력을 사용해 더 순수한 특성 표현을 얻기 위함.
+            ftr_dim = model.embed_dim # 특성 차원(feature dimension) 저장
             if load_checkpoint in ["", None]:
                 vit_checkpoint = vit_model.state_dict()
                 model.load_state_dict(vit_checkpoint, strict=False)
@@ -72,7 +73,7 @@ class FrozenInTime(BaseModel):
         self.video_feat_norm = nn.LayerNorm(ftr_dim, elementwise_affine=False)
 
         # Project to a common embedding
-        if projection == 'minimal':
+        if projection == 'minimal': # 서로 다른 차원의 텍스트, 비디오 특성을 공통 임베딩 공간으로 매핑하기 위한 프로젝션
             txt_proj = nn.Sequential(nn.ReLU(),
                                      nn.Linear(self.text_model.config.hidden_size, projection_dim),
                                      )
@@ -100,16 +101,16 @@ class FrozenInTime(BaseModel):
 
     def forward(self, data, return_embeds=True):
 
-        text_data = data['text']
-        video_data = data['video']
+        text_data = data['text']   # 텍스트 입력 (토큰화된 텍스트)
+        video_data = data['video'] # 비디오 입력 (텐서) 
 
-        text_embeddings = self.compute_text(text_data)
-        video_embeddings = self.compute_video(video_data)
+        text_embeddings = self.compute_text(text_data)    # 텍스트 임베딩 계산
+        video_embeddings = self.compute_video(video_data) # 비디오 임베딩 계산
 
         if return_embeds:
-            return text_embeddings, video_embeddings
+            return text_embeddings, video_embeddings         # 임베딩 반환
 
-        return sim_matrix(text_embeddings, video_embeddings)
+        return sim_matrix(text_embeddings, video_embeddings) # 유사도 행렬 반환
 
     def compute_text(self, text_data):
         if self.text_params['model'].startswith('bert'):
@@ -155,7 +156,7 @@ class FrozenInTime(BaseModel):
                     pass
 
             # 분포 보정
-            feats = self.video_feat_norm(feats.float())
+            feats = self.video_feat_norm(feats.to(torch.float32))
             feats = F.normalize(feats, dim=-1)  # L2
 
             # 텍스트와 동일한 차원으로 투영

@@ -35,6 +35,6 @@ def load_frames_from_video_path(path, num_frames, sample='rand'):
         else:
             raise ValueError
 
-    frames = torch.stack(frames).float() / 255
+    frames = torch.stack(frames).to(torch.float32) / 255
     cap.release()
     return frames, frame_idxs

@@ -209,3 +209,6 @@ finetuned_epoch7.pkl
 finetuned_epoch8.pkl
 finetuned_epoch9.pkl
 finetuned_epoch10.pkl
+
+uploads/
+src/model/model_yeonjae.py

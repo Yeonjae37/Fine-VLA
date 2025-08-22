@@ -187,7 +187,7 @@ def read_frames_cv2(video_path, num_frames, sample='rand', fix_start=None):
             pass
             # print(frame_idxs, ' fail ', index, f'  (vlen {vlen})')
 
-    frames = torch.stack(frames).float() / 255
+    frames = torch.stack(frames).to(torch.float32) / 255
     cap.release()
     return frames, success_idxs
 
@@ -202,7 +202,7 @@ def read_frames_av(video_path, num_frames, sample='rand', fix_start=None):
               'list returned.'.format(type(exception).__name__, video_path))
     vlen = len(frames)
     frame_idxs = sample_frames(num_frames, vlen, sample=sample, fix_start=fix_start)
-    frames = torch.stack([frames[idx] for idx in frame_idxs]).float() / 255
+    frames = torch.stack([frames[idx] for idx in frame_idxs]).to(torch.float32) / 255
     frames = frames.permute(0, 3, 1, 2)
     return frames, frame_idxs
 
@@ -215,7 +215,7 @@ def read_frames_decord(video_path, num_frames, sample='rand', fix_start=None):
     vlen = len(video_reader)
     frame_idxs = sample_frames(num_frames, vlen, sample=sample, fix_start=fix_start)
     frames = video_reader.get_batch(frame_idxs)
-    frames = frames.float() / 255
+    frames = frames.to(torch.float32) / 255
     frames = frames.permute(0, 3, 1, 2)
     return frames, frame_idxs
 

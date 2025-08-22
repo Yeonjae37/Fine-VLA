@@ -5,9 +5,9 @@
         "type": "FrozenInTime",
         "args": {
             "video_params": {
-                "model": "VJEPA2",
+                "model": "SpaceTimeTransformer",
                 "arch_config": "base_patch16_224",
-                "num_frames": 32,
+                "num_frames": 4,
                 "pretrained": true
             },
             "text_params": {
@@ -35,14 +35,14 @@
             },
             "video_params": {
                 "extraction_fps": 25,
-                "extraction_res": 320,
-                "input_res": 320,
-                "num_frames": 32,
+                "extraction_res": 224,
+                "input_res": 224,
+                "num_frames": 4,
                 "stride": 1
             },
             "tsfm_params": {
-                "input_res": 320,
-                "center_crop": 320
+                "input_res": 224,
+                "center_crop": 224
           }
         }
     },

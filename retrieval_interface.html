@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Annotation Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .search-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-btn {
+            padding: 15px 30px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        .search-btn:hover {
+            background-color: #45a049;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .video-player-section {
+            flex: 2;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-player-header {
+            margin-bottom: 15px;
+        }
+
+        .video-player-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .video-container {
+            position: relative;
+            flex: 1;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            min-height: 400px;
+        }
+
+        .main-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .video-controls {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .timeline-container {
+            margin-bottom: 15px;
+        }
+
+        .timeline {
+            width: 100%;
+            height: 8px;
+            background: #ddd;
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .timeline-progress {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+        }
+
+        .segment-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .control-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .control-btn.primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .control-btn.secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .control-btn.success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .control-btn:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
+        .segment-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .segment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .segment-time {
+            font-weight: bold;
+            color: #666;
+        }
+
+        .segment-label {
+            flex: 1;
+            margin: 0 10px;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* 오른쪽 검색 결과 영역 */
+        .retrieval-section {
+            flex: 1;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .retrieval-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .retrieval-header h2 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .results-count {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .retrieval-results {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding-right: 10px;
+        }
+
+        .result-item {
+            border: 2px solid #eee;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s;
+            cursor: pointer;
+            background: white;
+        }
+
+        .result-item:hover {
+            border-color: #4CAF50;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-item.selected {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+
+        .result-video {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            background: #f0f0f0;
+        }
+
+        .result-video-player {
+            width: 100%;
+            height: 100px;
+            background: #000;
+        }
+
+        .result-info {
+            padding: 10px;
+        }
+
+        .result-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .result-description {
+            color: #666;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .result-actions {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 70px;
+            padding: 5px 8px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .action-btn.use {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .action-btn.preview {
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .action-btn:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        }
+
+        /* 스크롤바 스타일링 */
+        .retrieval-results::-webkit-scrollbar,
+        .segment-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .retrieval-results::-webkit-scrollbar-track,
+        .segment-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .retrieval-results::-webkit-scrollbar-thumb,
+        .segment-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .retrieval-results::-webkit-scrollbar-thumb:hover,
+        .segment-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* 로딩 스피너 */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .video-player-section,
+            .retrieval-section {
+                flex: none;
+            }
+            
+            .retrieval-results {
+                grid-template-columns: 1fr;
+                max-height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .retrieval-results {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="search-header">
+        <div class="search-container">
+            <input type="file" id="videoUpload" accept="video/*" style="display: none;" onchange="uploadVideo()">
+            <button class="search-btn" style="margin-right: 15px; background-color: #ff9800;" onclick="document.getElementById('videoUpload').click()">비디오 업로드</button>
+            <input type="text" class="search-input" placeholder="검색하고 싶은 동작을 자연어로 입력하세요 (예: '사람이 걷는 동작', '공을 던지는 장면')" id="searchInput">
+            <button class="search-btn" onclick="performSearch()">검색</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="video-player-section">
+            <div class="video-player-header">
+                <h2>Long Stream Video</h2>
+            </div>
+            
+            <div class="video-container">
+                <video class="main-video" id="mainVideo" controls style="background: #333;">
+                    <source src="" type="video/mp4" id="mainVideoSource">
+                    비디오를 지원하지 않는 브라우저입니다.
+                </video>
+                <div id="videoPlaceholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; pointer-events: none;">
+                    <p style="font-size: 18px; margin-bottom: 10px;">📹</p>
+                    <p>비디오를 업로드하세요</p>
+                </div>
+            </div>
+
+            <div class="video-controls">
+                <div class="timeline-container">
+                    <div class="timeline" id="timeline">
+                        <div class="timeline-progress" id="timelineProgress"></div>
+                    </div>
+                </div>
+
+                <div class="segment-controls">
+                    <button class="control-btn primary" onclick="markStartTime()">시작점 표시</button>
+                    <button class="control-btn primary" onclick="markEndTime()">끝점 표시</button>
+                    <button class="control-btn success" onclick="createSegment()">세그먼트 생성</button>
+                    <button class="control-btn secondary" onclick="clearMarks()">선택 초기화</button>
+                </div>
+
+                <div class="segment-list" id="segmentList">
+                    <p style="text-align: center; color: #666; margin: 20px 0;">아직 생성된 세그먼트가 없습니다.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="retrieval-section">
+            <div class="retrieval-header">
+                <h2>검색 결과</h2>
+                <p class="results-count" id="resultsCount">검색을 시작하세요</p>
+            </div>
+
+            <div class="retrieval-results" id="retrievalResults">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let startTime = null;
+        let endTime = null;
+        let segments = [];
+        let searchResults = [];
+        let currentQuery = '';
+
+        const mainVideo = document.getElementById('mainVideo');
+        const timeline = document.getElementById('timeline');
+        const timelineProgress = document.getElementById('timelineProgress');
+
+        mainVideo.addEventListener('timeupdate', function() {
+            const progress = (mainVideo.currentTime / mainVideo.duration) * 100;
+            timelineProgress.style.width = progress + '%';
+        });
+
+        timeline.addEventListener('click', function(e) {
+            const rect = timeline.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            mainVideo.currentTime = percentage * mainVideo.duration;
+        });
+
+        function markStartTime() {
+            startTime = mainVideo.currentTime;
+            alert(`시작점이 ${formatTime(startTime)}로 설정되었습니다.`);
+        }
+
+        function markEndTime() {
+            endTime = mainVideo.currentTime;
+            if (startTime !== null && endTime <= startTime) {
+                alert('끝점은 시작점보다 뒤에 있어야 합니다.');
+                endTime = null;
+                return;
+            }
+            alert(`끝점이 ${formatTime(endTime)}로 설정되었습니다.`);
+        }
+
+        function clearMarks() {
+            startTime = null;
+            endTime = null;
+            alert('시작점과 끝점이 초기화되었습니다.');
+        }
+
+        function createSegment() {
+            if (startTime === null || endTime === null) {
+                alert('시작점과 끝점을 모두 설정해주세요.');
+                return;
+            }
+
+            const defaultLabel = currentQuery || '';
+            const label = prompt('이 세그먼트의 라벨을 입력하세요:', defaultLabel);
+            if (label) {
+                const segment = {
+                    id: Date.now(),
+                    startTime: startTime,
+                    endTime: endTime,
+                    label: label,
+                    duration: endTime - startTime
+                };
+                
+                segments.push(segment);
+                updateSegmentList();
+                
+                startTime = null;
+                endTime = null;
+                
+                alert('세그먼트가 생성되었습니다!');
+            }
+        }
+
+        function updateSegmentList() {
+            const segmentList = document.getElementById('segmentList');
+            
+            if (segments.length === 0) {
+                segmentList.innerHTML = '<p style="text-align: center; color: #666; margin: 20px 0;">아직 생성된 세그먼트가 없습니다.</p>';
+                return;
+            }
+
+            segmentList.innerHTML = segments.map(segment => `
+                <div class="segment-item">
+                    <span class="segment-time">${formatTime(segment.startTime)} - ${formatTime(segment.endTime)}</span>
+                    <input type="text" class="segment-label" value="${segment.label}" 
+                           onchange="updateSegmentLabel(${segment.id}, this.value)">
+                    <button class="control-btn secondary" onclick="deleteSegment(${segment.id})" style="padding: 4px 8px;">삭제</button>
+                </div>
+            `).join('');
+        }
+
+        function updateSegmentLabel(segmentId, newLabel) {
+            const segment = segments.find(s => s.id === segmentId);
+            if (segment) {
+                segment.label = newLabel;
+            }
+        }
+
+        function deleteSegment(segmentId) {
+            segments = segments.filter(s => s.id !== segmentId);
+            updateSegmentList();
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                alert('검색어를 입력해주세요.');
+                return;
+            }
+
+            currentQuery = query;
+
+            const resultsContainer = document.getElementById('retrievalResults');
+            resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            document.getElementById('resultsCount').textContent = '검색 중...';
+
+            try {
+                const response = await fetch('http://localhost:5000/api/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        top_k: 8
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`서버 오류: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displaySearchResults(data.results);
+                } else {
+                    throw new Error(data.error || '검색 실패');
+                }
+                
+            } catch (error) {
+                console.error('검색 오류:', error);
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; color: #d32f2f; margin: 50px 20px;">
+                        <p><strong>검색 중 오류가 발생했습니다</strong></p>
+                        <p style="font-size: 14px; margin-top: 10px;">${error.message}</p>
+                        <p style="font-size: 12px; margin-top: 15px; color: #666;">
+                            백엔드 서버(localhost:5000)가 실행 중인지 확인해주세요
+                        </p>
+                    </div>
+                `;
+                document.getElementById('resultsCount').textContent = '검색 실패';
+            }
+        }
+
+        function generateMockResults(query) {
+            const actions = ['걷기', '뛰기', '점프', '손 흔들기', '박수치기', '앉기', '일어서기', '회전하기'];
+            const results = [];
+            
+            for (let i = 0; i < 8; i++) {
+                const clipStartTime = Math.floor(Math.random() * 300);
+                const clipDuration = Math.floor(Math.random() * 10) + 3;
+                const clipEndTime = clipStartTime + clipDuration;
+                
+                results.push({
+                    id: i + 1,
+                    title: `${query} - 결과 ${i + 1}`,
+                    description: `${query}와 관련된 비디오 클립입니다. 길이: ${clipDuration}초`,
+                    videoUrl: `result-${i + 1}.mp4`,
+                    thumbnailUrl: `https://via.placeholder.com/200x120/4CAF50/white?text=Video+${i + 1}`,
+                    confidence: Math.random() * 0.3 + 0.7,
+                    duration: clipDuration,
+                    originalStartTime: clipStartTime,
+                    originalEndTime: clipEndTime
+                });
+            }
+            
+            return results.sort((a, b) => b.confidence - a.confidence);
+        }
+
+        function displaySearchResults(results) {
+            searchResults = results;
+            const resultsContainer = document.getElementById('retrievalResults');
+            const resultsCount = document.getElementById('resultsCount');
+            
+            resultsCount.textContent = `${results.length}개의 결과를 찾았습니다`;
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div style="text-align: center; color: #666; margin: 50px 0;"><p>검색 결과가 없습니다.</p></div>';
+                return;
+            }
+
+            const videoFilename = window.currentVideoFilename || 'stream_h264.mp4';
+
+            resultsContainer.innerHTML = results.map((result, index) => `
+                <div class="result-item" onclick="selectResult(${index})" data-result-index="${index}">
+                    <video class="result-video-player" controls preload="metadata" 
+                           data-segment-id="${result.segment_id}"
+                           data-start-time="${result.start_time}"
+                           data-end-time="${result.end_time}"
+                           onloadedmetadata="setVideoSegment(this)"
+                           onplay="handleSegmentPlay(this)"
+                           ontimeupdate="handleSegmentTimeUpdate(this)"
+                           onerror="handleVideoError(this)"
+                           crossorigin="anonymous">
+                        <source src="http://localhost:5000/uploads/${videoFilename}" type="video/mp4">
+                        비디오를 지원하지 않는 브라우저입니다.
+                    </video>
+                    <div class="result-info">
+                        <div class="result-title">세그먼트 ${result.segment_id + 1} (순위: ${result.rank})</div>
+                        <div class="result-description">시간: ${formatTime(result.start_time)} ~ ${formatTime(result.end_time)}</div>
+                        <div style="font-size: 11px; color: #888; margin-top: 5px;">
+                            유사도 점수: ${(result.score * 100).toFixed(1)}% | 길이: ${result.duration.toFixed(1)}초<br>
+                            원본 위치: ${formatTime(result.start_time)} ~ ${formatTime(result.end_time)}
+                        </div>
+                    </div>
+                    <div class="result-actions">
+                        <button class="action-btn use" onclick="useAsLabel(${index}); event.stopPropagation();">라벨로 사용</button>
+                        <button class="action-btn preview" onclick="playInMainVideo(${index}); event.stopPropagation();">원본에서 재생</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectResult(resultIndex) {
+            document.querySelectorAll('.result-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            event.currentTarget.classList.add('selected');
+
+            playInMainVideo(resultIndex);
+        }
+
+        function playInMainVideo(resultIndex) {
+            const result = searchResults[resultIndex];
+            if (!result || !mainVideo.duration) {
+                console.log('Cannot play in main video: result or video not available');
+                return;
+            }
+
+            mainVideo.currentTime = result.start_time;
+
+            const handleTimeUpdate = function() {
+                if (mainVideo.currentTime >= result.end_time) {
+                    mainVideo.pause();
+                    mainVideo.removeEventListener('timeupdate', handleTimeUpdate);
+                    console.log(`Segment playback ended at ${formatTime(result.end_time)}`);
+                }
+            };
+
+            mainVideo.removeEventListener('timeupdate', handleTimeUpdate);
+            mainVideo.addEventListener('timeupdate', handleTimeUpdate);
+
+            mainVideo.play().then(() => {
+                console.log(`Playing segment ${result.segment_id + 1}: ${formatTime(result.start_time)} - ${formatTime(result.end_time)}`);
+            }).catch(error => {
+                console.error('Error playing main video:', error);
+            });
+        }
+
+        function useAsLabel(resultIndex) {
+            const result = searchResults[resultIndex];
+            if (!result) return;
+
+            const labelText = currentQuery ? `${currentQuery} (세그먼트 ${result.segment_id + 1})` : `검색 결과 세그먼트 ${result.segment_id + 1}`;
+            
+            const segment = {
+                id: Date.now(),
+                startTime: result.start_time,
+                endTime: result.end_time,
+                label: labelText,
+                duration: result.duration,
+                source: 'retrieval',
+                score: result.score
+            };
+            
+            segments.push(segment);
+            updateSegmentList();
+
+            if (mainVideo.duration && result.start_time < mainVideo.duration) {
+                mainVideo.currentTime = result.start_time;
+            }
+            
+            alert(`세그먼트가 라벨로 추가되었습니다!\n시간: ${formatTime(result.start_time)} ~ ${formatTime(result.end_time)}\n유사도 점수: ${(result.score * 100).toFixed(1)}%`);
+        }
+
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoUpload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('비디오 파일을 선택해주세요.');
+                return;
+            }
+
+            const resultsContainer = document.getElementById('retrievalResults');
+            resultsContainer.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 20px; text-align: center;">비디오 업로드 및 인덱싱 중...</p>
+                    <p style="margin-top: 10px; text-align: center; font-size: 12px; color: #666;">
+                        이 과정은 비디오 길이에 따라 몇 분이 걸릴 수 있습니다
+                    </p>
+                </div>
+            `;
+            
+            document.getElementById('resultsCount').textContent = '비디오 처리 중...';
+
+            try {
+                const formData = new FormData();
+                formData.append('video', file);
+
+                const response = await fetch('http://localhost:5000/api/upload_video', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`업로드 오류: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const mainVideo = document.getElementById('mainVideo');
+                    const mainVideoSource = document.getElementById('mainVideoSource');
+                    const videoUrl = `http://localhost:5000/uploads/${file.name}`;
+                    
+                    mainVideoSource.src = videoUrl;
+                    mainVideo.load();
+
+                    document.getElementById('videoPlaceholder').style.display = 'none';
+
+                    window.currentVideoFilename = file.name;
+                    
+                    resultsContainer.innerHTML = `
+                        <div style="text-align: center; color: #4CAF50; margin: 50px 20px;">
+                            <p><strong>✓ 비디오 업로드 완료!</strong></p>
+                            <p style="font-size: 12px; margin-top: 15px; color: #666;">
+                                상단 검색창에서 원하는 동작을 검색해보세요
+                            </p>
+                        </div>
+                    `;
+                    
+                } else {
+                    throw new Error(data.error || '업로드 실패');
+                }
+                
+            } catch (error) {
+                console.error('업로드 오류:', error);
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; color: #d32f2f; margin: 50px 20px;">
+                        <p><strong>업로드 중 오류가 발생했습니다</strong></p>
+                        <p style="font-size: 14px; margin-top: 10px;">${error.message}</p>
+                        <p style="font-size: 12px; margin-top: 15px; color: #666;">
+                            백엔드 서버가 실행 중인지 확인해주세요
+                        </p>
+                    </div>
+                `;
+                document.getElementById('resultsCount').textContent = '업로드 실패';
+            }
+        }
+
+        function setVideoSegment(videoElement) {
+            const startTime = parseFloat(videoElement.getAttribute('data-start-time'));
+            const endTime = parseFloat(videoElement.getAttribute('data-end-time'));
+            
+            if (videoElement.readyState >= 2) {
+                videoElement.currentTime = startTime;
+            }
+        }
+
+        function handleSegmentPlay(videoElement) {
+            const startTime = parseFloat(videoElement.getAttribute('data-start-time'));
+            if (videoElement.currentTime < startTime || videoElement.currentTime > parseFloat(videoElement.getAttribute('data-end-time'))) {
+                videoElement.currentTime = startTime;
+            }
+        }
+
+        function handleSegmentTimeUpdate(videoElement) {
+            const endTime = parseFloat(videoElement.getAttribute('data-end-time'));
+            if (videoElement.currentTime >= endTime) {
+                videoElement.pause();
+                videoElement.currentTime = parseFloat(videoElement.getAttribute('data-start-time'));
+            }
+        }
+
+        function updateVideoSources(filename) {
+            const videoPlayers = document.querySelectorAll('.result-video-player');
+            videoPlayers.forEach(video => {
+                const startTime = video.getAttribute('data-start-time');
+                const endTime = video.getAttribute('data-end-time');
+                const source = video.querySelector('source');
+                if (source) {
+                    source.src = `http://localhost:5000/uploads/${filename}#t=${startTime},${endTime}`;
+                    video.load();
+                }
+            });
+        }
+
+        function handleVideoError(videoElement) {
+            console.error('Video error:', videoElement.error);
+            console.log('Video src:', videoElement.src);
+            console.log('Video ready state:', videoElement.readyState);
+            console.log('Video network state:', videoElement.networkState);
+            
+            if (videoElement.error) {
+                console.error('Error code:', videoElement.error.code);
+                console.error('Error message:', videoElement.error.message);
+            }
+
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: red; text-align: center; font-size: 12px; z-index: 1000; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 5px;';
+            
+            let errorMsg = '비디오 로드 실패';
+            if (videoElement.error) {
+                switch(videoElement.error.code) {
+                    case 1: errorMsg = '비디오 로드 중단됨'; break;
+                    case 2: errorMsg = '네트워크 오류'; break;
+                    case 3: errorMsg = '비디오 디코딩 오류'; break;
+                    case 4: errorMsg = '지원하지 않는 형식'; break;
+                }
+            }
+            
+            errorDiv.innerHTML = errorMsg + '<br><small>콘솔에서 자세한 정보 확인</small>';
+            videoElement.parentElement.style.position = 'relative';
+            videoElement.parentElement.appendChild(errorDiv);
+        }
+
+        document.getElementById('mainVideo').addEventListener('loadeddata', function() {
+            console.log('Main video loaded successfully');
+            document.getElementById('videoPlaceholder').style.display = 'none';
+        });
+
+        document.getElementById('mainVideo').addEventListener('error', function(e) {
+            console.error('Main video error:', e);
+            document.getElementById('videoPlaceholder').innerHTML = '<p style="color: red;">비디오 로드 실패</p>';
+        });
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        window.addEventListener('load', function() {
+            console.log('Video Annotation Interface 로드 완료');
+
+            const resultsContainer = document.getElementById('retrievalResults');
+            resultsContainer.innerHTML = `
+                <div style="text-align: center; color: #666; margin: 50px 20px;">
+                    <p><strong>1단계: 비디오 업로드</strong></p>
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>
