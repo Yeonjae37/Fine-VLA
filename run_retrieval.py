@@ -9,10 +9,7 @@ import pathlib
 import platform
 import re
 import faiss
-
-if platform.system() == 'Windows':
-    pathlib.PosixPath = pathlib.WindowsPath
-
+import numpy as np
 import cv2
 from flask import Flask, request, jsonify, send_file, send_from_directory, Response
 from flask_cors import CORS
@@ -23,14 +20,21 @@ import pickle
 import json
 from pathlib import Path
 
-import numpy as np
+sys.path.append('.')
+sys.path.append('./scripts')
+import src.data.data_loader as module_data
+import src.model.model as module_arch
+from parse_config import ConfigParser
+from src.utils.util import state_dict_data_parallel_fix
+from src.data.base_dataset import read_frames_decord, sample_frames
+from src.data.transforms import init_transform_dict
+from src.model.text_augmentation import augment_text_labels, average_augmented_embeddings
+import torchvision.transforms as T
+
+if platform.system() == 'Windows':
+    pathlib.PosixPath = pathlib.WindowsPath
 
 class SimpleIndex:
-    """
-    - 항상 Inner Product(IP) 기반 (L2 정규화 후 코사인과 동치).
-    - add/search 시 자동 L2 정규화.
-    - FAISS 있으면 IndexFlatIP, 없으면 넘파이 행렬 사용.
-    """
     def __init__(self, dim, use_faiss=True):
         self.dim = dim
         self.use_faiss = (faiss is not None) and use_faiss
@@ -51,7 +55,6 @@ class SimpleIndex:
         if self.use_faiss:
             faiss.normalize_L2(X)
             self.index.add(X)
-        # 항상 raw matrix도 유지(저장/로드/넘파이 검색)
         self._matrix = X if self._matrix is None else np.vstack([self._matrix, X])
 
     def search(self, Q, topk):
@@ -68,17 +71,8 @@ class SimpleIndex:
             return picked, idxs
 
     def all_vectors(self):
-        return self._matrix  # 저장용
+        return self._matrix
 
-sys.path.append('.')
-sys.path.append('./scripts')
-import src.data.data_loader as module_data
-import src.model.model as module_arch
-from parse_config import ConfigParser
-from src.utils.util import state_dict_data_parallel_fix
-from src.data.base_dataset import read_frames_decord, sample_frames
-from src.data.transforms import init_transform_dict
-import torchvision.transforms as T
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -91,21 +85,20 @@ class VideoRetrievalSystem:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.config = self._load_config(config_path)
         self.model, self.tokenizer = self._load_model(checkpoint_path)
-        self.index = None            # ← 심플 인덱스 핸들
-        self.segment_metadata = []   # 세그먼트 메타
-        self._emb_dim = None         # 임베딩 차원
-        self._emb_matrix = None      # 저장/로드용 임베딩 행렬
+        self.index = None
+        self.segment_metadata = []
+        self._emb_dim = None
+        self._emb_matrix = None
 
         self._num_frames = int(self.config['arch']['args']['video_params'].get('num_frames', 4))
-        
-        # transforms 초기화 (test.py와 동일)
+
         video_params = self.config['arch']['args']['video_params']
         self.video_params = video_params
         transform_dict = init_transform_dict(
             input_res=video_params.get('input_res', 224),
             center_crop=video_params.get('center_crop', 256)
         )
-        self.transforms = transform_dict['test']  # test용 transform 사용
+        self.transforms = transform_dict['test']
         
         self.load_index_and_metadata()
 
@@ -158,7 +151,7 @@ class VideoRetrievalSystem:
         
         return model, tokenizer
     
-    def segment_video(self, video_path, segment_duration=5):
+    def segment_video(self, video_path, segment_duration=2):
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
@@ -217,21 +210,6 @@ class VideoRetrievalSystem:
             
         return vid_embeds.cpu().numpy()
     
-    def _create_temp_segment(self, video_path, start_time, end_time):
-        temp_dir = tempfile.mkdtemp()
-        safe_filename = f"segment_{start_time:.1f}_{end_time:.1f}".replace('.', '_')
-        temp_path = os.path.join(temp_dir, f"{safe_filename}.mp4")
-
-        video_path = os.path.abspath(video_path) # for Window
-        temp_path = os.path.abspath(temp_path) # for Window
-
-        if os.name == 'nt':  # Windows
-            cmd = f'ffmpeg -i "{video_path}" -ss {start_time} -t {end_time - start_time} -c copy "{temp_path}" -y -loglevel quiet'
-        else:  # Linux/Mac
-            cmd = f'ffmpeg -i "{video_path}" -ss {start_time} -t {end_time - start_time} -c copy "{temp_path}" -y > /dev/null 2>&1'
-        
-        return temp_path
-    
     def _load_video_segment_frames(self, video_path, start_time, end_time):
         try:
             cap = cv2.VideoCapture(video_path)
@@ -286,54 +264,12 @@ class VideoRetrievalSystem:
             print(f"Error loading segment frames: {e}")
             res = self.video_params.get('input_res', 224)
             return torch.zeros(1, self._num_frames, 3, res, res)
-
-
     
-    def _load_video_frames(self, video_path):
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            print(f"Cannot open video: {video_path}")
-            return torch.zeros(1, 16, 3, 224, 224)
-        
-        frames = []
-        frame_count = 0
-        max_frames = 16
-        
-        while frame_count < max_frames:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(frame)
-            frame_count += 1
-        
-        cap.release()
-
-        if frames: # 프레임 텐서로 변환
-            import torchvision.transforms as transforms
-            transform = transforms.Compose([
-                transforms.ToPILImage(),
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
-            
-            tensor_frames = torch.stack([transform(frame) for frame in frames])
-
-            if len(tensor_frames) < 16:
-                padding = torch.zeros(16 - len(tensor_frames), 3, 224, 224)
-                tensor_frames = torch.cat([tensor_frames, padding], dim=0)
-            
-            return tensor_frames.unsqueeze(0)
-            print(f"No frames extracted from {video_path}")
-            return torch.zeros(1, 16, 3, 224, 224)
-    
-    def build_faiss_index(self, video_path, segment_duration=5):
+    def build_faiss_index(self, video_path, segment_duration=2):
         print(f"Building index for video: {video_path}")
         segments = self.segment_video(video_path, segment_duration)
 
         embeds, metadata = [], []
-        print("Extracting embeddings for each segment...")
         for i, seg in enumerate(tqdm(segments)):
             try:
                 e = self.extract_video_segment_embedding(video_path, seg['start_time'], seg['end_time'])
@@ -363,22 +299,40 @@ class VideoRetrievalSystem:
         self.save_index_and_metadata()
 
     
-    def search_query(self, query_text, top_k=8):
+    def search_query(self, query_text, top_k=8, use_text_augmentation=True):
         if not self.segment_metadata:
             raise ValueError("Index not built. Call build_faiss_index first.")
 
-        # 인덱스가 없다면 저장된 행렬로 재구축
         if self.index is None:
             if self._emb_matrix is None:
                 raise ValueError("No index and no embedding matrix to rebuild from.")
             self.index = SimpleIndex(self._emb_dim, use_faiss=True)
             self.index.add(self._emb_matrix)
 
-        # 쿼리 임베딩
-        toks = self.tokenizer([query_text], return_tensors='pt', padding=True, truncation=True)
-        toks = {k: v.to(self.device) for k, v in toks.items()}
-        with torch.no_grad():
-            q = self.model.compute_text(toks).cpu().numpy().astype('float32')  # (1, D)
+        if use_text_augmentation:
+            aug_data = augment_text_labels([query_text])
+            augmented_texts = aug_data['augmented_texts']
+            label_groups = aug_data['label_groups']
+            aug_embeds = []
+            batch_size = 32
+            
+            with torch.no_grad():
+                for i in range(0, len(augmented_texts), batch_size):
+                    batch_texts = augmented_texts[i:i+batch_size]
+                    batch_tokens = self.tokenizer(batch_texts, return_tensors='pt', padding=True, truncation=True)
+                    batch_tokens = {key: val.to(self.device) for key, val in batch_tokens.items()}
+                    
+                    batch_text_embeds = self.model.compute_text(batch_tokens)
+                    aug_embeds.append(batch_text_embeds.cpu())
+                all_aug_embeds = torch.cat(aug_embeds, dim=0)  # [total_augmented_texts, embed_dim]
+                averaged_text_embeds = average_augmented_embeddings(all_aug_embeds, label_groups)  # [1, embed_dim]
+                
+                q = averaged_text_embeds.cpu().numpy().astype('float32')  # (1, D)
+        else:
+            toks = self.tokenizer([query_text], return_tensors='pt', padding=True, truncation=True)
+            toks = {k: v.to(self.device) for k, v in toks.items()}
+            with torch.no_grad():
+                q = self.model.compute_text(toks).cpu().numpy().astype('float32')  # (1, D)
 
         scores, idxs = self.index.search(q, top_k)
         scores, idxs = scores[0], idxs[0]
@@ -402,7 +356,6 @@ class VideoRetrievalSystem:
     def save_index_and_metadata(self, save_dir="saved_indices"):
         try:
             os.makedirs(save_dir, exist_ok=True)
-            # 메타/행렬/설정 저장
             np.save(os.path.join(save_dir, "segment_metadata.npy"), self.segment_metadata)
             if self._emb_matrix is not None:
                 np.save(os.path.join(save_dir, "embeddings.npy"), self._emb_matrix)
@@ -485,12 +438,14 @@ def search():
     
     query = data['query']
     top_k = data.get('top_k', 8)
+    use_text_augmentation = data.get('use_text_augmentation', True)  # 기본값은 True
     
     try:
-        results = retrieval_system.search_query(query, top_k)
+        results = retrieval_system.search_query(query, top_k, use_text_augmentation)
         return jsonify({
             'success': True,
             'query': query,
+            'use_text_augmentation': use_text_augmentation,
             'results': results
         })
         

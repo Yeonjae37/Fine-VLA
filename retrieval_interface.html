@@ -395,7 +395,13 @@
             <input type="file" id="videoUpload" accept="video/*" style="display: none;" onchange="uploadVideo()">
             <button class="search-btn" style="margin-right: 15px; background-color: #ff9800;" onclick="document.getElementById('videoUpload').click()">비디오 업로드</button>
             <input type="text" class="search-input" placeholder="검색하고 싶은 동작을 자연어로 입력하세요 (예: '사람이 걷는 동작', '공을 던지는 장면')" id="searchInput">
-            <button class="search-btn" onclick="performSearch()">검색</button>
+            <div style="display: flex; align-items: center; gap: 10px; margin-left: 10px;">
+                <label style="color: white; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="textAugmentationCheckbox" checked style="transform: scale(1.2);">
+                    텍스트 증강
+                </label>
+                <button class="search-btn" onclick="performSearch()">검색</button>
+            </div>
         </div>
     </div>
 
@@ -562,11 +568,13 @@
             }
 
             currentQuery = query;
+            const useTextAugmentation = document.getElementById('textAugmentationCheckbox').checked;
 
             const resultsContainer = document.getElementById('retrievalResults');
             resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
-            document.getElementById('resultsCount').textContent = '검색 중...';
+            const searchStatus = useTextAugmentation ? '검색 중 (텍스트 증강 적용)...' : '검색 중...';
+            document.getElementById('resultsCount').textContent = searchStatus;
 
             try {
                 const response = await fetch('http://localhost:5000/api/search', {
@@ -576,7 +584,8 @@
                     },
                     body: JSON.stringify({
                         query: query,
-                        top_k: 8
+                        top_k: 8,
+                        use_text_augmentation: useTextAugmentation
                     })
                 });
 
@@ -588,6 +597,9 @@
                 
                 if (data.success) {
                     displaySearchResults(data.results);
+                    // 검색 결과에 텍스트 증강 사용 여부 표시
+                    const augmentationStatus = data.use_text_augmentation ? ' (텍스트 증강 적용)' : ' (기본 검색)';
+                    document.getElementById('resultsCount').textContent = `"${query}" 검색 결과 ${data.results.length}개${augmentationStatus}`;
                 } else {
                     throw new Error(data.error || '검색 실패');
                 }
